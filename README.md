@@ -11,6 +11,17 @@ output, with retries, cost accounting, a CLI, and a FastAPI service.
 
 ---
 
+## ⚡ Quick Start
+
+```bash
+git clone https://github.com/Arunops700/structured-extractor.git && cd structured-extractor
+uv sync --extra dev          # installs everything — no API keys needed
+uv run extract schemas       # list the built-in extraction schemas
+```
+*Runs offline.* Add `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` to a local `.env` to extract for real.
+
+---
+
 ## Problem
 
 LLMs are great at reading messy text — invoices, emails, support tickets — but applications
