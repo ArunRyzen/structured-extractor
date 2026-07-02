@@ -51,17 +51,28 @@ class AnthropicProvider:
         try:
             response = self._client.messages.parse(
                 model=self._model,
+                # Hard cap on how much the model may write back — a cost/safety brake.
                 max_tokens=self._max_tokens,
+                # The behavioral rules ("extract, don't invent") ride along as the
+                # system prompt, separate from the text being processed.
                 system=instructions,
                 messages=[{"role": "user", "content": text}],
+                # The key line: the model can only return text, and this forces that
+                # text to be valid JSON in exactly our Pydantic schema's shape.
                 output_format=schema,
             )
         except anthropic.APIError as exc:  # auth, rate limit, server, connection
+            # Translate the SDK-specific error into OUR error type, so the rest of the
+            # app never needs to import (or even know about) the Anthropic SDK.
             raise ProviderError(f"Anthropic request failed: {exc}") from exc
 
+        # The model may decline unsafe requests instead of answering; surface that as a
+        # clear error rather than a confusing "no output".
         if response.stop_reason == "refusal":
             raise ProviderError("Anthropic declined the request (safety refusal).")
 
+        # `parsed_output` is the already-validated Pydantic object the SDK built for us.
+        # None means the output couldn't be parsed (e.g. it was cut off by max_tokens).
         parsed = response.parsed_output
         if parsed is None:
             raise ProviderError("Anthropic returned no parseable structured output.")

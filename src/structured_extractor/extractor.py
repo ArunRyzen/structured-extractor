@@ -67,12 +67,22 @@ class Extractor:
         connection blip) and the rare case where output doesn't validate. Both are worth
         one or two more attempts; a persistent failure is raised so callers can react.
         """
+        # If the caller didn't write their own instructions, build sensible ones from
+        # the schema. Either way, this string becomes the model's "system prompt" —
+        # the standing rules it must follow while reading the user's text.
         system = instructions or _default_instructions(schema)
         last_error: Exception | None = None
 
+        # `max_retries=2` means up to 3 total tries: the first attempt + 2 retries.
+        # LLM APIs fail transiently all the time (rate limits, brief outages), so a
+        # couple of retries turns "flaky" into "reliable" for almost no extra code.
         for attempt in range(1, self._max_retries + 2):  # initial try + retries
             try:
+                # The actual model call. Which provider runs here was decided elsewhere
+                # (factory.py) — this loop genuinely does not know or care which one.
                 response = self._provider.extract(text=text, schema=schema, instructions=system)
+                # Success: bundle the validated object with bookkeeping (which provider,
+                # how many tries, what it cost) so callers can log and budget.
                 return ExtractionResult(
                     data=response.data,
                     usage=response.usage,
@@ -80,6 +90,9 @@ class Extractor:
                     attempts=attempt,
                 )
             except (ProviderError, ValidationError) as error:
+                # Two retryable failure kinds: the API call itself broke (ProviderError),
+                # or the model's output didn't match our schema (ValidationError).
+                # Remember the error, log it, and let the loop try again.
                 last_error = error
                 logger.warning(
                     "extraction attempt %d/%d failed: %s",
@@ -88,7 +101,8 @@ class Extractor:
                     error,
                 )
 
-        # Exhausted retries — translate into a clear, typed failure.
+        # Exhausted retries — translate into a clear, typed failure so the CLI/API can
+        # tell the user *what kind* of problem it was, not just "something went wrong".
         if isinstance(last_error, ValidationError):
             raise SchemaValidationError(
                 f"Output failed schema validation after {self._max_retries + 1} attempts."

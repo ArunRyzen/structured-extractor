@@ -49,16 +49,25 @@ class OpenAIProvider:
             completion = self._client.beta.chat.completions.parse(
                 model=self._model,
                 max_tokens=self._max_tokens,
+                # temperature=0 → always pick the most likely next token. Extraction
+                # wants the same answer every time, not creative variety.
                 temperature=0,
+                # OpenAI puts the system prompt in the messages list (role "system"),
+                # unlike Anthropic's separate `system=` argument. Same idea, new spelling.
                 messages=[
                     {"role": "system", "content": instructions},
                     {"role": "user", "content": text},
                 ],
+                # Forces the reply to be valid JSON matching our Pydantic schema —
+                # OpenAI's equivalent of Anthropic's `output_format`.
                 response_format=schema,
             )
         except openai.OpenAIError as exc:
+            # Wrap the SDK error in our own type so callers stay provider-agnostic.
             raise ProviderError(f"OpenAI request failed: {exc}") from exc
 
+        # A completion can contain several alternative answers ("choices"); we asked
+        # for one, so we take the first.
         message = completion.choices[0].message
         if message.refusal:
             raise ProviderError(f"OpenAI declined the request: {message.refusal}")

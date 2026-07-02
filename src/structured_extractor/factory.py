@@ -14,7 +14,24 @@ from structured_extractor.providers.base import LLMProvider
 
 
 def build_provider(settings: Settings) -> LLMProvider:
-    """Instantiate the provider named in settings, validating that creds exist."""
+    """Instantiate the provider named in settings, validating that creds exist.
+
+    This is the ONE place where "which LLM backend?" is decided. Each branch checks the
+    matching API key first so a missing key fails fast with a clear message, instead of
+    a confusing HTTP 401 from deep inside an SDK.
+    """
+    if settings.provider == "gemini":
+        if not settings.gemini_api_key:
+            raise ProviderError("GEMINI_API_KEY is not set.")
+        # Imported here (not at the top) so simply having this file on the import path
+        # never forces the Gemini SDK to load — only choosing it does.
+        from structured_extractor.providers.gemini_provider import GeminiProvider
+
+        return GeminiProvider(
+            model=settings.gemini_model,
+            max_tokens=settings.max_tokens,
+            api_key=settings.gemini_api_key,
+        )
     if settings.provider == "anthropic":
         if not settings.anthropic_api_key:
             raise ProviderError("ANTHROPIC_API_KEY is not set.")
@@ -35,7 +52,9 @@ def build_provider(settings: Settings) -> LLMProvider:
             max_tokens=settings.max_tokens,
             api_key=settings.openai_api_key,
         )
-    raise ProviderError(f"Unknown provider '{settings.provider}' (use 'anthropic' or 'openai').")
+    raise ProviderError(
+        f"Unknown provider '{settings.provider}' (use 'gemini', 'anthropic', or 'openai')."
+    )
 
 
 def build_extractor(settings: Settings) -> Extractor:
