@@ -28,12 +28,20 @@ def _settings() -> Settings:
 
 
 class ExtractRequest(BaseModel):
+    """The JSON body a client POSTs to /extract.
+
+    FastAPI validates incoming requests against this model automatically — e.g. an
+    empty `text` is rejected with a 422 before our code (or any paid model) runs.
+    """
+
     text: str = Field(min_length=1, description="The text to extract from.")
     schema_name: str = Field(description="A registered schema name; see GET /schemas.")
     provider: str | None = Field(default=None, description="Override provider for this call.")
 
 
 class ExtractResponse(BaseModel):
+    """What /extract returns: the extracted data plus full cost/attempt accounting."""
+
     provider: str
     model: str
     attempts: int
@@ -56,10 +64,13 @@ def list_schemas() -> dict[str, list[str]]:
 
 @app.post("/extract", response_model=ExtractResponse)
 def extract(request: ExtractRequest) -> ExtractResponse:
+    # Look up the schema by name; 404 is the natural "that thing doesn't exist" answer.
     schema = SCHEMA_REGISTRY.get(request.schema_name)
     if schema is None:
         raise HTTPException(status_code=404, detail=f"Unknown schema '{request.schema_name}'.")
 
+    # Same override trick as the CLI: clone the settings for this one request rather
+    # than mutating the cached global settings (which other requests share).
     settings = _settings()
     if request.provider is not None:
         settings = settings.model_copy(update={"provider": request.provider})

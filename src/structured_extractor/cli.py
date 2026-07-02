@@ -34,14 +34,18 @@ def run(
     text: Annotated[str | None, typer.Argument(help="Text to extract from.")] = None,
     file: Annotated[Path | None, typer.Option(help="Read text from a file instead.")] = None,
     provider: Annotated[
-        str | None, typer.Option(help="Override provider: anthropic | openai.")
+        str | None, typer.Option(help="Override provider: gemini | anthropic | openai.")
     ] = None,
 ) -> None:
     """Extract `--schema` from the given text (positional) or `--file`."""
+    # Fail fast on a bad schema name — exit code 2 is the Unix convention for
+    # "you called me wrong" (vs 1 for "I tried and failed").
     if schema not in SCHEMA_REGISTRY:
         typer.echo(f"Unknown schema '{schema}'. Run `extract schemas`.", err=True)
         raise typer.Exit(code=2)
 
+    # Three ways in, one variable out: --file wins, then the positional argument,
+    # then whatever is piped into stdin (`echo "..." | extract run ...`).
     if file is not None:
         source = file.read_text(encoding="utf-8")
     elif text is not None:
@@ -52,17 +56,23 @@ def run(
         typer.echo("No input text provided.", err=True)
         raise typer.Exit(code=2)
 
+    # Settings come from env vars / .env; the --provider flag overrides just for this
+    # run without touching your config (`model_copy` clones instead of mutating).
     settings = load_settings()
     if provider is not None:
         settings = settings.model_copy(update={"provider": provider})
 
     try:
+        # build_extractor wires up the right provider from settings; extract() does the
+        # model call, retries, and validation. The CLI stays a thin shell around it.
         extractor = build_extractor(settings)
         result = extractor.extract(source, SCHEMA_REGISTRY[schema])
     except ExtractionError as exc:
         typer.echo(f"Extraction failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
+    # JSON goes to stdout, the cost summary to stderr — so you can pipe the JSON into
+    # another tool (`extract run ... | jq .name`) without the summary polluting it.
     typer.echo(result.data.model_dump_json(indent=2))
     usage = result.usage
     typer.echo(

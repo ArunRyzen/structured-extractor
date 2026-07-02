@@ -19,6 +19,9 @@ _PRICING_PER_MTOK: dict[str, tuple[float, float]] = {
     # OpenAI (illustrative defaults; override via the table if your model differs)
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-mini": (0.15, 0.60),
+    # Google Gemini (paid-tier list prices; the free tier costs $0 up to its quota)
+    "gemini-2.5-flash": (0.30, 2.50),
+    "gemini-2.5-pro": (1.25, 10.00),
 }
 
 
