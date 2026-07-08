@@ -43,6 +43,19 @@ Validated JSON prints to stdout; a one-line token/cost summary goes to stderr. H
 Anthropic or OpenAI keys instead? Set `PROVIDER=anthropic` / `PROVIDER=openai` in `.env`,
 or override per call with `--provider`.
 
+### 🔍 Peek behind the curtain
+
+Want to see exactly what gets sent to the model and what comes back? Set `LLM_DEBUG`:
+
+```powershell
+$env:LLM_DEBUG="1"; uv run extract run --schema contact "Hi, I'm Ada, ada@example.com"
+```
+
+Every AI request (system prompt, user text, schema) and response (raw output, token
+counts) is printed to **stderr** — stdout still carries only the JSON result, so piping
+keeps working. You'll also see a `VALIDATION FAILED ... - retrying` block whenever the
+retry seatbelt fires. Turn it off with `Remove-Item Env:LLM_DEBUG`.
+
 ---
 
 ## Problem

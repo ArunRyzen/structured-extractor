@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
+from structured_extractor.debuglog import log_block
 from structured_extractor.errors import ProviderError
 from structured_extractor.providers.base import ProviderResponse
 from structured_extractor.usage import TokenUsage
@@ -47,6 +48,15 @@ class AnthropicProvider:
         instructions: str,
     ) -> ProviderResponse:
         import anthropic
+
+        # Learning aid: with LLM_DEBUG=1 this shows exactly what we send to the model
+        # (never the API key). It's a no-op otherwise.
+        log_block(
+            f"AI REQUEST ({self.name}/{self._model})",
+            system=instructions,
+            user=text,
+            schema=schema.__name__,
+        )
 
         try:
             response = self._client.messages.parse(
@@ -81,5 +91,11 @@ class AnthropicProvider:
             model=self._model,
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
+        )
+        # And what came back: the validated JSON plus what it cost in tokens.
+        log_block(
+            f"AI RESPONSE ({self.name}/{self._model})",
+            output=parsed.model_dump_json(),
+            tokens=f"in={usage.input_tokens} out={usage.output_tokens}",
         )
         return ProviderResponse(data=parsed, usage=usage)

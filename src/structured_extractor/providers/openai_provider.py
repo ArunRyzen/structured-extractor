@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
+from structured_extractor.debuglog import log_block
 from structured_extractor.errors import ProviderError
 from structured_extractor.providers.base import ProviderResponse
 from structured_extractor.usage import TokenUsage
@@ -44,6 +45,15 @@ class OpenAIProvider:
         instructions: str,
     ) -> ProviderResponse:
         import openai
+
+        # Learning aid: with LLM_DEBUG=1 this shows exactly what we send to the model
+        # (never the API key). It's a no-op otherwise.
+        log_block(
+            f"AI REQUEST ({self.name}/{self._model})",
+            system=instructions,
+            user=text,
+            schema=schema.__name__,
+        )
 
         try:
             completion = self._client.beta.chat.completions.parse(
@@ -81,5 +91,11 @@ class OpenAIProvider:
             model=self._model,
             input_tokens=usage_raw.prompt_tokens if usage_raw else 0,
             output_tokens=usage_raw.completion_tokens if usage_raw else 0,
+        )
+        # And what came back: the validated JSON plus what it cost in tokens.
+        log_block(
+            f"AI RESPONSE ({self.name}/{self._model})",
+            output=parsed.model_dump_json(),
+            tokens=f"in={usage.input_tokens} out={usage.output_tokens}",
         )
         return ProviderResponse(data=parsed, usage=usage)

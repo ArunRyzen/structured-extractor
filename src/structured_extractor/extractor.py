@@ -14,6 +14,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from structured_extractor.debuglog import log_block
 from structured_extractor.errors import ProviderError, SchemaValidationError
 from structured_extractor.providers.base import LLMProvider
 from structured_extractor.usage import TokenUsage
@@ -100,6 +101,18 @@ class Extractor:
                     self._max_retries + 1,
                     error,
                 )
+                # Learning aid (LLM_DEBUG=1): when the model's output flunks schema
+                # validation and we're about to try again, say so loudly — this is the
+                # "seatbelt" of the whole project firing in real time.
+                if isinstance(error, ValidationError) and attempt <= self._max_retries:
+                    log_block(
+                        f"VALIDATION FAILED (attempt {attempt}) - retrying",
+                        error=str(error),
+                        note=(
+                            "The model's reply did not match the schema, so the "
+                            "extractor is asking it again."
+                        ),
+                    )
 
         # Exhausted retries — translate into a clear, typed failure so the CLI/API can
         # tell the user *what kind* of problem it was, not just "something went wrong".
