@@ -42,7 +42,7 @@ def _debug_from_dotenv() -> bool:
         from dotenv import dotenv_values
     except ImportError:
         return False  # no dotenv library -> quietly fall back to "disabled"
-    value = dotenv_values(".env").get("LLM_DEBUG")
+    value = dotenv_values(".env", encoding="utf-8-sig").get("LLM_DEBUG")
     if value is None:
         return False
     return _is_truthy(value)
