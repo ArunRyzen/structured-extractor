@@ -45,16 +45,25 @@ or override per call with `--provider`.
 
 ### 🔍 Peek behind the curtain
 
-Want to see exactly what gets sent to the model and what comes back? Set `LLM_DEBUG`:
+Want to see exactly what gets sent to the model and what comes back? Set `LLM_DEBUG`
+for one session:
 
 ```powershell
 $env:LLM_DEBUG="1"; uv run extract run --schema contact "Hi, I'm Ada, ada@example.com"
 ```
 
-Every AI request (system prompt, user text, schema) and response (raw output, token
-counts) is printed to **stderr** — stdout still carries only the JSON result, so piping
-keeps working. You'll also see a `VALIDATION FAILED ... - retrying` block whenever the
-retry seatbelt fires. Turn it off with `Remove-Item Env:LLM_DEBUG`.
+Or keep it on across sessions by adding a line to your `.env` file:
+
+```dotenv
+LLM_DEBUG=1
+```
+
+(The environment variable wins when both are set, so `$env:LLM_DEBUG="0"` silences a
+`.env` that says `1`.) Every AI request (system prompt, user text, schema) and response
+(raw output, token counts) is printed to **stderr** — stdout still carries only the JSON
+result, so piping keeps working. You'll also see a `VALIDATION FAILED ... - retrying`
+block whenever the retry seatbelt fires. Turn it off with `Remove-Item Env:LLM_DEBUG`
+(and remove the `.env` line if you added it).
 
 ---
 

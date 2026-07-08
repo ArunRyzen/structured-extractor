@@ -323,7 +323,9 @@ If you can narrate those seven steps from memory, you understand the codebase.
 
 ## Bonus: watch a request live with `LLM_DEBUG`
 
-Set the environment variable `LLM_DEBUG=1` and every provider prints the full request
+Set the environment variable `LLM_DEBUG=1` (or put `LLM_DEBUG=1` in your `.env` — a real
+environment variable takes precedence over the file when both are set) and every provider
+prints the full request
 (system prompt, user text, schema name) and response (raw output, token counts) to stderr,
 and the retry loop announces when a validation failure triggers another attempt. All the
 printing lives in `debuglog.py` — three tiny functions, called at each LLM call site, that
