@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
+from structured_extractor.debuglog import log_block
 from structured_extractor.errors import ProviderError
 from structured_extractor.providers.base import ProviderResponse
 from structured_extractor.usage import TokenUsage
@@ -54,6 +55,15 @@ class GeminiProvider:
         instructions: str,
     ) -> ProviderResponse:
         from google.genai import errors, types
+
+        # Learning aid: with LLM_DEBUG=1 this shows exactly what we send to the model
+        # (never the API key). It's a no-op otherwise.
+        log_block(
+            f"AI REQUEST ({self.name}/{self._model})",
+            system=instructions,
+            user=text,
+            schema=schema.__name__,
+        )
 
         try:
             response = self._client.models.generate_content(
@@ -91,5 +101,11 @@ class GeminiProvider:
             model=self._model,
             input_tokens=(meta.prompt_token_count or 0) if meta else 0,
             output_tokens=(meta.candidates_token_count or 0) if meta else 0,
+        )
+        # And what came back: the validated JSON plus what it cost in tokens.
+        log_block(
+            f"AI RESPONSE ({self.name}/{self._model})",
+            output=parsed.model_dump_json(),
+            tokens=f"in={usage.input_tokens} out={usage.output_tokens}",
         )
         return ProviderResponse(data=parsed, usage=usage)

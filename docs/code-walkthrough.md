@@ -30,6 +30,7 @@ a CLI, and a web API.
 | The `extract` command | `src/structured_extractor/cli.py` | `run()` |
 | The HTTP endpoints | `src/structured_extractor/api.py` | `POST /extract` |
 | Offline test fakes | `tests/conftest.py` | `FakeProvider`, `FlakyProvider` |
+| **Debug logging** (watch every request/response live) | `src/structured_extractor/debuglog.py` | `debug_enabled()` / `log_block()` — set `LLM_DEBUG=1` and everything prints to stderr |
 
 ## Suggested reading order
 
@@ -319,3 +320,13 @@ break.
 7. Back in `cli.py` — JSON to stdout, `[gemini/gemini-2.5-flash] ... tokens (~$...)` to stderr.
 
 If you can narrate those seven steps from memory, you understand the codebase.
+
+## Bonus: watch a request live with `LLM_DEBUG`
+
+Set the environment variable `LLM_DEBUG=1` and every provider prints the full request
+(system prompt, user text, schema name) and response (raw output, token counts) to stderr,
+and the retry loop announces when a validation failure triggers another attempt. All the
+printing lives in `debuglog.py` — three tiny functions, called at each LLM call site, that
+never touch stdout and never print your API key. It's the fastest way to *see* the
+concepts above (system prompt vs. user text, forced JSON, retries) instead of just
+reading about them.

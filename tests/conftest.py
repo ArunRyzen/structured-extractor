@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
+import pytest
 from pydantic import BaseModel
 
 from structured_extractor.errors import ProviderError
@@ -17,6 +18,15 @@ from structured_extractor.schemas import ContactInfo
 from structured_extractor.usage import TokenUsage
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
+
+
+@pytest.fixture(autouse=True)
+def _no_llm_debug(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the suite deterministic even if a developer has LLM_DEBUG exported.
+
+    Tests that exercise the debug output opt back in with `monkeypatch.setenv`.
+    """
+    monkeypatch.delenv("LLM_DEBUG", raising=False)
 
 
 class FakeProvider:
