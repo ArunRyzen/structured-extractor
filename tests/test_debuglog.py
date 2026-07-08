@@ -1,15 +1,20 @@
 """LLM_DEBUG learning-mode tests — fully offline, like everything else in the suite.
 
-Three things must hold:
-- With LLM_DEBUG unset, extraction produces NO debug output (silence is the default).
+Four things must hold:
+- With LLM_DEBUG off, extraction produces NO debug output (silence is the default).
 - With LLM_DEBUG=1, every provider call prints `=== AI REQUEST` / `=== AI RESPONSE`
   blocks to stderr (never stdout — the CLI's JSON lives there).
 - When the model's output flunks schema validation and a retry fires, a clearly
   labeled `VALIDATION FAILED ... retrying` block appears.
+- `LLM_DEBUG` can also come from a `.env` file, but a real environment variable
+  always outranks it.
 """
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Iterator
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TypeVar
 from unittest.mock import MagicMock
@@ -17,7 +22,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import BaseModel
 
-from structured_extractor.debuglog import debug_enabled, log_block
+from structured_extractor.debuglog import _debug_from_dotenv, debug_enabled, log_block
 from structured_extractor.extractor import Extractor
 from structured_extractor.providers.base import ProviderResponse
 from structured_extractor.providers.gemini_provider import GeminiProvider
@@ -63,7 +68,7 @@ class InvalidThenValidProvider:
 
 
 def test_debug_disabled_when_unset() -> None:
-    # conftest's autouse fixture guarantees LLM_DEBUG is not set here.
+    # conftest's autouse fixture pins LLM_DEBUG to "0", which outranks any local .env.
     assert debug_enabled() is False
 
 
@@ -77,6 +82,59 @@ def test_debug_disabled_for_falsey_values(monkeypatch: pytest.MonkeyPatch, value
 def test_debug_enabled_for_truthy_values(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
     monkeypatch.setenv("LLM_DEBUG", value)
     assert debug_enabled() is True
+
+
+# --- the .env fallback ---------------------------------------------------------------
+
+
+@pytest.fixture
+def _fresh_dotenv_cache() -> Iterator[None]:
+    """Clear the cached .env lookup before AND after a test that depends on the cwd."""
+    _debug_from_dotenv.cache_clear()
+    yield
+    _debug_from_dotenv.cache_clear()
+
+
+def test_dotenv_file_enables_debug(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _fresh_dotenv_cache: None
+) -> None:
+    (tmp_path / ".env").write_text("LLM_DEBUG=1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LLM_DEBUG")  # no env var -> the .env file gets its say
+
+    assert debug_enabled() is True
+
+
+def test_env_var_outranks_dotenv_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _fresh_dotenv_cache: None
+) -> None:
+    (tmp_path / ".env").write_text("LLM_DEBUG=1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LLM_DEBUG", "0")  # a real env var wins, even a falsey one
+
+    assert debug_enabled() is False
+
+
+def test_disabled_with_no_dotenv_and_no_env_var(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _fresh_dotenv_cache: None
+) -> None:
+    monkeypatch.chdir(tmp_path)  # an empty directory: no .env file here
+    monkeypatch.delenv("LLM_DEBUG")
+
+    assert debug_enabled() is False
+
+
+def test_disabled_when_dotenv_library_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _fresh_dotenv_cache: None
+) -> None:
+    (tmp_path / ".env").write_text("LLM_DEBUG=1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LLM_DEBUG")
+    # Setting a module's sys.modules entry to None makes `import dotenv` raise
+    # ImportError — simulating an environment without python-dotenv installed.
+    monkeypatch.setitem(sys.modules, "dotenv", None)  # type: ignore[arg-type]
+
+    assert debug_enabled() is False
 
 
 # --- provider call sites -------------------------------------------------------------

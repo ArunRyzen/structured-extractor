@@ -22,11 +22,15 @@ SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 @pytest.fixture(autouse=True)
 def _no_llm_debug(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep the suite deterministic even if a developer has LLM_DEBUG exported.
+    """Keep the suite deterministic even if a developer has LLM_DEBUG switched on.
 
+    `debug_enabled()` now also reads `.env` in the current directory, and a developer's
+    real `.env` may well say `LLM_DEBUG=1`. Simply *unsetting* the env var would let
+    that file leak into the tests, so instead we set the env var to "0" — env-var
+    precedence guarantees debug stays off no matter what any local `.env` says.
     Tests that exercise the debug output opt back in with `monkeypatch.setenv`.
     """
-    monkeypatch.delenv("LLM_DEBUG", raising=False)
+    monkeypatch.setenv("LLM_DEBUG", "0")
 
 
 class FakeProvider:
